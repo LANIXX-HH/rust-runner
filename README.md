@@ -26,17 +26,17 @@ Lade die neueste Version von der [Releases-Seite](https://github.com/lanixx-hh/r
 
 ```bash
 # Linux x86_64
-wget https://github.com/lanixx-hh/rust-runner/releases/latest/download/rust-runner-linux-x86_64
+wget https://github.com/LANIXX-HH/rust-runner/releases/download/latest/rust-runner-linux-x86_64
 chmod +x rust-runner-linux-x86_64
 sudo mv rust-runner-linux-x86_64 /usr/local/bin/rust-runner
 
 # macOS x86_64
-wget https://github.com/lanixx-hh/rust-runner/releases/latest/download/rust-runner-macos-x86_64
+wget https://github.com/LANIXX-HH/rust-runner/releases/download/latest/rust-runner-macos-x86_64
 chmod +x rust-runner-macos-x86_64
 sudo mv rust-runner-macos-x86_64 /usr/local/bin/rust-runner
 
 # macOS Apple Silicon (M1/M2)
-wget https://github.com/lanixx-hh/rust-runner/releases/latest/download/rust-runner-macos-aarch64
+wget https://github.com/LANIXX-HH/rust-runner/releases/download/latest/rust-runner-macos-aarch64
 chmod +x rust-runner-macos-aarch64
 sudo mv rust-runner-macos-aarch64 /usr/local/bin/rust-runner
 ```
