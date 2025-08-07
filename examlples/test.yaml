@@ -1,0 +1,44 @@
+version: 1
+globals:
+  app_name: myapp
+  test_dir: "/tmp/rust-runner-test"
+  env:
+    RUST_LOG: info
+
+steps:
+  - name: Test lokaler Shell-Befehl
+    shell:
+      command: "echo 'Hello from {{ app_name }}!'"
+      env:
+        TEST_VAR: "{{ app_name }}_test"
+  
+  - name: Test exec mit Argumenten
+    exec:
+      cmd: "ls"
+      args:
+        - "-la"
+        - "."
+      env:
+        LS_COLORS: "auto"
+  
+  - name: Erstelle Test-Verzeichnis
+    shell:
+      command: "mkdir -p {{ test_dir }}"
+  
+  - name: Erstelle Test-Konfiguration
+    conf:
+      dest: "{{ test_dir }}/{{ app_name }}_config.toml"
+      template: |
+        [app]
+        name = "{{ app_name }}"
+        log_level = "{{ env.RUST_LOG }}"
+        user = "{{ ENV.USER }}"
+        
+        [database]
+        url = "sqlite://{{ test_dir }}/{{ app_name }}.db"
+      backup: true
+      mode: "0644"
+  
+  - name: Zeige erstellte Datei
+    shell:
+      command: "cat {{ test_dir }}/{{ app_name }}_config.toml"

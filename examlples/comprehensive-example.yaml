@@ -1,0 +1,130 @@
+version: 1
+globals:
+  app_name: rust-runner-demo
+  version: "1.0.0"
+  deploy_user: deploy
+  target_host: production.example.com
+  app_dir: "/opt/{{ app_name }}"
+  config_dir: "/etc/{{ app_name }}"
+  log_dir: "/var/log/{{ app_name }}"
+  backup_dir: "/backup/{{ app_name }}"
+  database:
+    host: db.example.com
+    name: "{{ app_name }}_prod"
+    user: "{{ app_name }}_user"
+  env:
+    RUST_LOG: info
+    APP_ENV: production
+
+steps:
+  # Lokale Vorbereitung
+  - name: Erstelle lokales Build-Verzeichnis
+    shell:
+      command: "mkdir -p ./build/{{ app_name }}"
+      cwd: "."
+  
+  - name: Kopiere Anwendungsdateien
+    exec:
+      cmd: "cp"
+      args:
+        - "-r"
+        - "./target/release/{{ app_name }}"
+        - "./build/{{ app_name }}/"
+      cwd: "."
+  
+  # Konfigurationsdateien erstellen
+  - name: Erstelle Hauptkonfiguration
+    conf:
+      dest: "./build/{{ app_name }}/config.toml"
+      backup: false
+      mode: "0644"
+      template: |
+        [app]
+        name = "{{ app_name }}"
+        version = "{{ version }}"
+        environment = "{{ env.APP_ENV }}"
+        log_level = "{{ env.RUST_LOG }}"
+        
+        [server]
+        host = "0.0.0.0"
+        port = 8080
+        
+        [database]
+        host = "{{ database.host }}"
+        name = "rust-runner-demo_prod"
+        user = "rust-runner-demo_user"
+        # Passwort sollte aus ENV kommen (Beispiel)
+        password = "changeme"
+        
+        [logging]
+        level = "{{ env.RUST_LOG }}"
+        file = "/var/log/rust-runner-demo/rust-runner-demo.log"
+  
+  - name: Erstelle Systemd Service-Datei
+    conf:
+      dest: "./build/{{ app_name }}/{{ app_name }}.service"
+      backup: false
+      mode: "0644"
+      template: |
+        [Unit]
+        Description={{ app_name }} Service
+        After=network.target
+        
+        [Service]
+        Type=simple
+        User={{ deploy_user }}
+        Group={{ deploy_user }}
+        WorkingDirectory=/opt/rust-runner-demo
+        ExecStart=/opt/rust-runner-demo/rust-runner-demo
+        Restart=always
+        RestartSec=10
+        Environment=RUST_LOG={{ env.RUST_LOG }}
+        Environment=APP_ENV={{ env.APP_ENV }}
+        
+        [Install]
+        WantedBy=multi-user.target
+  
+  # Deployment-Simulation (ohne echtes SSH)
+  - name: Simuliere Service-Stop
+    shell:
+      command: "echo 'Würde Service stoppen: sudo systemctl stop {{ app_name }}'"
+      env:
+        SERVICE_NAME: "{{ app_name }}"
+  
+  - name: Simuliere Backup der alten Version
+    shell:
+      command: "echo 'Würde Backup erstellen: cp /opt/rust-runner-demo/rust-runner-demo /backup/rust-runner-demo/rust-runner-demo-$(date +%Y%m%d-%H%M%S)'"
+  
+  - name: Simuliere Binary-Upload
+    exec:
+      cmd: "echo"
+      args:
+        - "Würde Binary hochladen:"
+        - "rsync -avz ./build/{{ app_name }}/{{ app_name }} {{ deploy_user }}@{{ target_host }}:/opt/rust-runner-demo/"
+  
+  - name: Simuliere Konfiguration-Upload
+    exec:
+      cmd: "echo"
+      args:
+        - "Würde Konfiguration hochladen:"
+        - "rsync -avz ./build/{{ app_name }}/config.toml {{ deploy_user }}@{{ target_host }}:/etc/rust-runner-demo/"
+  
+  - name: Zeige erstellte Konfigurationsdateien
+    shell:
+      command: "find ./build/{{ app_name }} -type f -exec echo 'Datei: {}' \\; -exec cat {} \\; -exec echo '---' \\;"
+  
+  # Conditional Step (nur wenn when: true)
+  - name: Optionaler Schritt (wird ausgeführt)
+    when: true
+    shell:
+      command: "echo 'Dieser Schritt wird ausgeführt, da when: true'"
+  
+  - name: Übersprungener Schritt (wird nicht ausgeführt)
+    when: false
+    shell:
+      command: "echo 'Dieser Schritt wird übersprungen, da when: false'"
+  
+  # Cleanup
+  - name: Räume Build-Verzeichnis auf
+    shell:
+      command: "rm -rf ./build"

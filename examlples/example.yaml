@@ -1,0 +1,46 @@
+version: 1
+globals:
+  app_name: myapp
+  user: deploy
+  host: localhost
+  bin_path: "/opt/{{ app_name }}/bin/{{ app_name }}"
+  env:
+    RUST_LOG: info
+
+steps:
+  - name: Test lokaler Shell-Befehl
+    shell:
+      command: "echo 'Hello from {{ app_name }}!'"
+      env:
+        TEST_VAR: "{{ app_name }}_test"
+  
+  - name: Test exec mit Argumenten
+    exec:
+      cmd: "ls"
+      args:
+        - "-la"
+        - "."
+      env:
+        LS_COLORS: "auto"
+  
+  - name: Erstelle Test-Konfiguration
+    conf:
+      dest: "/tmp/{{ app_name }}_config.toml"
+      template: |
+        [app]
+        name = "{{ app_name }}"
+        log_level = "{{ env.RUST_LOG }}"
+        
+        [database]
+        url = "sqlite:///tmp/{{ app_name }}.db"
+      backup: true
+      mode: "0644"
+  
+  - name: Test SSH (lokal via localhost)
+    ssh:
+      host: "{{ host }}"
+      user: "{{ ENV.USER }}"
+      command: "echo 'SSH test successful for {{ app_name }}'"
+      check_host: "no"
+      env:
+        REMOTE_VAR: "{{ app_name }}_remote"
