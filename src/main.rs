@@ -1,14 +1,14 @@
 // src/main.rs
+mod executor;
 mod schema;
 mod template;
-mod executor;
 
 use anyhow::{Context, Result};
 use clap::Parser;
 use schema::Document;
 
 #[derive(Parser, Debug)]
-#[command(name="rust-runner", version, about="YAML-gesteuerte Ausführung")]
+#[command(name = "rust-runner", version, about = "YAML-gesteuerte Ausführung")]
 struct Cli {
     /// Pfad zur YAML-Datei
     file: String,

@@ -4,22 +4,33 @@ use crate::template::Renderer;
 use anyhow::{Context, Result};
 use serde_yaml::Value;
 use std::path::Path;
-use tokio::{io::{AsyncBufReadExt, BufReader}, process::Command};
+use tokio::{
+    io::{AsyncBufReadExt, BufReader},
+    process::Command,
+};
 
 pub struct Executor {
     renderer: Renderer,
     ctx: Value,
+    #[allow(dead_code)]
     verbose: bool,
     dry_run: bool,
 }
 
 impl Executor {
     pub fn new(globals: Value, verbose: bool, dry_run: bool) -> Self {
-        Self { renderer: Renderer::new(), ctx: globals, verbose, dry_run }
+        Self {
+            renderer: Renderer::new(),
+            ctx: globals,
+            verbose,
+            dry_run,
+        }
     }
 
     pub async fn run_step(&self, step: &Step, idx: usize) -> Result<()> {
-        if let Some(false) = step.when { return Ok(()) }
+        if let Some(false) = step.when {
+            return Ok(());
+        }
 
         if let Some(shell) = &step.shell {
             self.run_shell(step, shell, idx).await
@@ -37,14 +48,19 @@ impl Executor {
     async fn run_shell(&self, step: &Step, spec: &ShellSpec, idx: usize) -> Result<()> {
         let cmd_str = self.renderer.render_str(&spec.command, &self.ctx)?;
         let shell = spec.shell.clone().unwrap_or_else(|| "bash -c".into());
-        let mut parts = shell.split_whitespace().map(|s| s.to_string()).collect::<Vec<_>>();
+        let mut parts = shell
+            .split_whitespace()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>();
         let (prg, mut args) = (parts.remove(0), parts);
         args.push(cmd_str.clone());
 
         let env = self.merge_env(&step.env, &spec.env)?;
         self.print_header(idx, step.name.as_deref().unwrap_or("shell"), &cmd_str);
 
-        if self.dry_run { return Ok(()) }
+        if self.dry_run {
+            return Ok(());
+        }
 
         let mut child = Command::new(&prg)
             .args(&args)
@@ -60,14 +76,18 @@ impl Executor {
 
     async fn run_exec(&self, step: &Step, spec: &ExecSpec, idx: usize) -> Result<()> {
         let cmd = self.renderer.render_str(&spec.cmd, &self.ctx)?;
-        let args = spec.args.iter()
+        let args = spec
+            .args
+            .iter()
             .map(|a| self.renderer.render_str(a, &self.ctx))
             .collect::<Result<Vec<_>>>()?;
         let env = self.merge_env(&step.env, &spec.env)?;
         let line = format!("{} {}", cmd, shell_escape::escape(args.join(" ").into()));
         self.print_header(idx, step.name.as_deref().unwrap_or("exec"), &line);
 
-        if self.dry_run { return Ok(()) }
+        if self.dry_run {
+            return Ok(());
+        }
 
         let mut child = Command::new(&cmd)
             .args(&args)
@@ -84,20 +104,22 @@ impl Executor {
     async fn run_conf(&self, step: &Step, spec: &ConfSpec, idx: usize) -> Result<()> {
         let dest = self.renderer.render_str(&spec.dest, &self.ctx)?;
         let content = self.renderer.render_str(&spec.template, &self.ctx)?;
-        self.print_header(idx, step.name.as_deref().unwrap_or("conf"), &format!("write {}", dest));
+        self.print_header(
+            idx,
+            step.name.as_deref().unwrap_or("conf"),
+            &format!("write {}", dest),
+        );
 
-        if self.dry_run { 
+        if self.dry_run {
             println!("Content preview:\n{}", content);
-            return Ok(()) 
+            return Ok(());
         }
 
         let path = Path::new(&dest);
-        if spec.backup {
-            if path.exists() {
-                let bak = format!("{}.bak", dest);
-                std::fs::copy(&dest, &bak).context("backup copy")?;
-                println!("[conf] backup -> {}", bak);
-            }
+        if spec.backup && path.exists() {
+            let bak = format!("{}.bak", dest);
+            std::fs::copy(&dest, &bak).context("backup copy")?;
+            println!("[conf] backup -> {}", bak);
         }
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -124,26 +146,37 @@ impl Executor {
 
         let mut ssh_cmd = vec!["ssh".to_string()];
         match spec.check_host.as_deref() {
-            Some("no") | None => ssh_cmd.extend(["-o","StrictHostKeyChecking=no","-o","UserKnownHostsFile=/dev/null"].map(String::from)),
-            Some("yes") => {},
-            Some("fingerprint") => {}, // TODO: known_hosts Handling
+            Some("no") | None => ssh_cmd.extend(
+                [
+                    "-o",
+                    "StrictHostKeyChecking=no",
+                    "-o",
+                    "UserKnownHostsFile=/dev/null",
+                ]
+                .map(String::from),
+            ),
+            Some("yes") => {}
+            Some("fingerprint") => {} // TODO: known_hosts Handling
             _ => {}
         }
         // Key/Passwort: für openssh via ssh-Optionen; Passwort interaktiv wird vermieden
-        if let Some(auth) = &spec.auth {
-            if auth.kind == "key" {
-                if let Some(k) = &auth.key_path {
-                    let key = self.renderer.render_str(k, &self.ctx)?;
-                    ssh_cmd.extend(["-i", &key].iter().map(|s| s.to_string()));
-                }
-            }
+        if let Some(auth) = &spec.auth
+            && auth.kind == "key"
+            && let Some(k) = &auth.key_path
+        {
+            let key = self.renderer.render_str(k, &self.ctx)?;
+            ssh_cmd.extend(["-i", &key].iter().map(|s| s.to_string()));
         }
         ssh_cmd.push(format!("{}@{}", user, host));
         // ENV inline export
         let env_export = if env.is_empty() {
             "".to_string()
         } else {
-            let assigns = env.iter().map(|(k,v)| format!("{}={}", k, shell_escape::escape(v.into()))).collect::<Vec<_>>().join(" ");
+            let assigns = env
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, shell_escape::escape(v.into())))
+                .collect::<Vec<_>>()
+                .join(" ");
             format!("{} ", assigns)
         };
         ssh_cmd.push(format!("{}{}", env_export, command));
@@ -151,7 +184,9 @@ impl Executor {
         let line = ssh_cmd.join(" ");
         self.print_header(idx, step.name.as_deref().unwrap_or("ssh"), &line);
 
-        if self.dry_run { return Ok(()) }
+        if self.dry_run {
+            return Ok(());
+        }
 
         let mut child = Command::new(&ssh_cmd[0])
             .args(&ssh_cmd[1..])
@@ -169,8 +204,12 @@ impl Executor {
         local_env: &std::collections::HashMap<String, String>,
     ) -> Result<std::collections::HashMap<String, String>> {
         let mut env = std::env::vars().collect::<std::collections::HashMap<_, _>>();
-        for (k,v) in step_env { env.insert(k.clone(), self.renderer.render_str(v, &self.ctx)?); }
-        for (k,v) in local_env { env.insert(k.clone(), self.renderer.render_str(v, &self.ctx)?); }
+        for (k, v) in step_env {
+            env.insert(k.clone(), self.renderer.render_str(v, &self.ctx)?);
+        }
+        for (k, v) in local_env {
+            env.insert(k.clone(), self.renderer.render_str(v, &self.ctx)?);
+        }
         Ok(env)
     }
 

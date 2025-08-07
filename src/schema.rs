@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 #[derive(Deserialize, Debug)]
 pub struct Document {
+    #[allow(dead_code)]
     pub version: u32,
     #[serde(default)]
     pub globals: serde_yaml::Value,
@@ -13,9 +14,11 @@ pub struct Document {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub struct SshAuth {
-    pub kind: String,             // "password" | "key"
+    pub kind: String, // "password" | "key"
+    #[allow(dead_code)]
     pub password: Option<String>, // templated
     pub key_path: Option<String>, // templated
+    #[allow(dead_code)]
     pub passphrase: Option<String>,
 }
 
@@ -69,8 +72,10 @@ pub struct Step {
     #[serde(default)]
     pub when: Option<bool>,
     #[serde(default)]
+    #[allow(dead_code)]
     pub timeout: Option<u64>,
     #[serde(default)]
+    #[allow(dead_code)]
     pub retry: Option<u32>,
     #[serde(default)]
     pub env: HashMap<String, String>,
